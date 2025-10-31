@@ -32,20 +32,87 @@
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen" x-data="taskManager()">
+    <!-- 环境选择界面 -->
+    <div x-show="currentView === 'envSelect'" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div class="bg-white rounded-2xl shadow-2xl p-12 max-w-2xl w-full mx-4">
+            <div class="text-center mb-8">
+                <div class="inline-block p-4 bg-primary-100 rounded-full mb-4">
+                    <i class="fas fa-server text-5xl text-primary-600"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">选择运行环境</h1>
+                <p class="text-gray-600">请选择要操作的环境，不同环境的任务和数据是独立的</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 灰度环境 -->
+                <button @click="selectEnvironment('gray')" 
+                        class="group relative overflow-hidden bg-gradient-to-br from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 border-2 border-orange-300 rounded-xl p-8 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                    <div class="text-center">
+                        <div class="inline-block p-4 bg-orange-200 rounded-full mb-4 group-hover:bg-orange-300 transition-colors">
+                            <i class="fas fa-flask text-4xl text-orange-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-orange-900 mb-2">灰度环境</h2>
+                        <p class="text-orange-700 text-sm">测试和验证新功能</p>
+                        <div class="mt-4 inline-flex items-center text-orange-600 font-medium">
+                            <span>进入灰度</span>
+                            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    </div>
+                </button>
+                
+                <!-- 线上环境 -->
+                <button @click="selectEnvironment('production')" 
+                        class="group relative overflow-hidden bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 border-2 border-green-300 rounded-xl p-8 transition-all duration-300 hover:shadow-xl hover:scale-105">
+                    <div class="text-center">
+                        <div class="inline-block p-4 bg-green-200 rounded-full mb-4 group-hover:bg-green-300 transition-colors">
+                            <i class="fas fa-rocket text-4xl text-green-600"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-green-900 mb-2">线上环境</h2>
+                        <p class="text-green-700 text-sm">正式生产环境</p>
+                        <div class="mt-4 inline-flex items-center text-green-600 font-medium">
+                            <span>进入线上</span>
+                            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    </div>
+                </button>
+            </div>
+            
+            <div class="mt-8 text-center text-sm text-gray-500">
+                <i class="fas fa-info-circle mr-1"></i>
+                选择后可在导航栏切换环境
+            </div>
+        </div>
+    </div>
+
     <!-- 导航栏 -->
-    <nav class="bg-white shadow-lg border-b border-gray-200">
+    <nav x-show="currentView !== 'envSelect'" class="bg-white shadow-lg border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
+                <div class="flex items-center space-x-4">
                     <div class="flex-shrink-0">
                         <i class="fas fa-robot text-2xl text-primary-600"></i>
                     </div>
-                    <div class="ml-3">
+                    <div>
                         <h1 class="text-xl font-bold text-gray-900">AIGC任务生产平台</h1>
                         <p class="text-sm text-gray-500">智能任务配置与管理</p>
                     </div>
+                    <!-- 当前环境显示 -->
+                    <div class="ml-6 px-4 py-2 rounded-lg border-2" 
+                         :class="currentEnvironment === 'gray' ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas" :class="currentEnvironment === 'gray' ? 'fa-flask text-orange-600' : 'fa-rocket text-green-600'"></i>
+                            <span class="font-medium" :class="currentEnvironment === 'gray' ? 'text-orange-900' : 'text-green-900'" 
+                                  x-text="currentEnvironment === 'gray' ? '灰度环境' : '线上环境'"></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-3">
+                    <!-- 环境切换按钮 -->
+                    <button @click="switchEnvironment()" 
+                            class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors border border-gray-300 hover:border-gray-400">
+                        <i class="fas fa-exchange-alt"></i>
+                        <span>切换环境</span>
+                    </button>
                     <button x-show="currentView === 'detail'" @click="backToList()" 
                             class="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
                         <i class="fas fa-arrow-left"></i>
@@ -69,7 +136,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-xs text-gray-500 mb-1">总任务数</p>
-                        <p class="text-2xl font-semibold text-gray-900" x-text="tasks.length"></p>
+                        <p class="text-2xl font-semibold text-gray-900" x-text="getCurrentEnvironmentTasksCount()"></p>
                     </div>
                     <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
                         <i class="fas fa-tasks text-blue-500"></i>
@@ -783,7 +850,8 @@
         function taskManager() {
             return {
                 // 视图状态
-                currentView: 'list', // 'list' or 'detail'
+                currentView: 'envSelect', // 'envSelect', 'list' or 'detail'
+                currentEnvironment: null, // 'gray' or 'production'
                 
                 // 任务数据
                 tasks: [
@@ -803,8 +871,29 @@
                             { name: 'description', type: 'string' },
                             { name: 'keywords', type: 'array' }
                         ],
-                        isCompleted: false, // 用户是否标记为已完成
+                        isCompleted: false,
+                        environment: 'gray', // 灰度环境任务
                         createdAt: new Date('2024-01-15T10:30:00')
+                    },
+                    {
+                        id: 2,
+                        name: '线上内容生成',
+                        description: '正式环境的内容生成任务',
+                        difyUrl: 'https://api.dify.ai/v1/chat-messages',
+                        difyKey: 'sk-prod-***',
+                        maxRetries: 3,
+                        retryCount: 0,
+                        inputFields: [
+                            { name: 'hotel_id', type: 'string' },
+                            { name: 'foreign', type: 'string' }
+                        ],
+                        outputFields: [
+                            { name: 'description', type: 'string' },
+                            { name: 'keywords', type: 'array' }
+                        ],
+                        isCompleted: false,
+                        environment: 'production', // 线上环境任务
+                        createdAt: new Date('2024-01-16T09:00:00')
                     }
                 ],
 
@@ -908,7 +997,8 @@
 
                 // 获取过滤后的任务列表（不分页）
                 getFilteredTasks() {
-                    let filteredTasks = [...this.tasks];
+                    // 只获取当前环境的任务
+                    let filteredTasks = this.tasks.filter(task => task.environment === this.currentEnvironment);
                     
                     // 按创建时间倒序排列（最新的在最上面）
                     filteredTasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -947,18 +1037,29 @@
                     return Math.max(1, Math.ceil(total / this.taskPageSize));
                 },
 
-                // 获取任务统计
+                // 获取任务统计（只统计当前环境的任务）
+                getCurrentEnvironmentTasksCount() {
+                    return this.tasks.filter(task => task.environment === this.currentEnvironment).length;
+                },
+
                 getRunningTasks() {
-                    return this.tasks.filter(task => this.getTaskActualStatus(task) === 'running').length;
+                    return this.tasks.filter(task => 
+                        task.environment === this.currentEnvironment && 
+                        this.getTaskActualStatus(task) === 'running'
+                    ).length;
                 },
 
                 getPendingTasks() {
-                    return this.tasks.filter(task => this.getTaskActualStatus(task) === 'pending').length;
+                    return this.tasks.filter(task => 
+                        task.environment === this.currentEnvironment && 
+                        this.getTaskActualStatus(task) === 'pending'
+                    ).length;
                 },
 
                 getFailedTasks() {
-                    // 统计有失败Cases的任务数
+                    // 统计当前环境中有失败Cases的任务数
                     return this.tasks.filter(task => {
+                        if (task.environment !== this.currentEnvironment) return false;
                         const stats = this.getTaskCaseStats(task.id);
                         return stats.failed > 0;
                     }).length;
@@ -1120,6 +1221,39 @@
                     return texts[status] || '未知';
                 },
 
+                // 环境相关
+                getEnvironmentClass(environment) {
+                    const classes = {
+                        'none': 'bg-gray-100 text-gray-800',
+                        'gray': 'bg-orange-100 text-orange-800',
+                        'production': 'bg-green-100 text-green-800'
+                    };
+                    return classes[environment] || 'bg-gray-100 text-gray-800';
+                },
+
+                getEnvironmentText(environment) {
+                    const texts = {
+                        'none': '未部署',
+                        'gray': '灰度环境',
+                        'production': '线上环境'
+                    };
+                    return texts[environment] || '未部署';
+                },
+
+                updateEnvironment(task, environment) {
+                    const taskIndex = this.tasks.findIndex(t => t.id === task.id);
+                    if (taskIndex !== -1) {
+                        const updatedTask = {
+                            ...this.tasks[taskIndex],
+                            environment: environment
+                        };
+                        this.tasks.splice(taskIndex, 1, updatedTask);
+                        
+                        const envText = environment === 'gray' ? '灰度环境' : '线上环境';
+                        alert(`任务"${task.name}"已成功更新到${envText}！`);
+                    }
+                },
+
                 // Case状态相关（保持原有逻辑）
                 getStatusClass(status) {
                     const classes = {
@@ -1185,6 +1319,24 @@
                     this.currentPage = 1;
                 },
 
+                // 环境管理
+                selectEnvironment(env) {
+                    this.currentEnvironment = env;
+                    this.currentView = 'list';
+                },
+
+                switchEnvironment() {
+                    if (confirm('切换环境将返回到环境选择页面，当前页面数据不会丢失。确定要切换吗？')) {
+                        this.currentView = 'envSelect';
+                        this.currentEnvironment = null;
+                    }
+                },
+
+                // 获取当前环境的任务
+                getCurrentEnvironmentTasks() {
+                    return this.tasks.filter(task => task.environment === this.currentEnvironment);
+                },
+
                 // 任务管理
                 addInputField() {
                     this.currentTask.inputFields.push({ name: '', type: 'string' });
@@ -1244,6 +1396,7 @@
                             retryCount: 0,
                             maxRetries: 3,
                             isCompleted: false,
+                            environment: this.currentEnvironment, // 新任务分配到当前环境
                             createdAt: new Date()
                         };
                         this.tasks.push(newTask);
