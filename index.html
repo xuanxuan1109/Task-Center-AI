@@ -836,6 +836,7 @@
                                     <!-- 编辑模式 -->
                                     <div x-show="editingOutput">
                                         <textarea x-model="editingOutputData" 
+                                                  @input="outputDataChanged = true"
                                                   rows="10"
                                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
                                                   placeholder="JSON格式的输出数据"></textarea>
@@ -860,21 +861,11 @@
                             </div>
                         </div>
                         
-                        <div class="bg-gray-50 px-6 py-3 flex justify-between items-center">
-                            <button @click="clearCaseEnvironmentData(selectedCase.id); showCaseDetailModal = false" 
-                                    class="px-4 py-2 bg-orange-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-orange-700">
-                                <i class="fas fa-broom"></i> 清除环境数据
+                        <div class="bg-gray-50 px-6 py-4 flex justify-center" x-show="outputDataChanged && editingOutput">
+                            <button @click="saveAndUploadOutput()" 
+                                    class="px-8 py-2 bg-primary-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-sm">
+                                <i class="fas fa-cloud-upload-alt mr-2"></i>保存并上传
                             </button>
-                            <div class="flex space-x-3">
-                                <button @click="showCaseDetailModal = false" 
-                                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                    关闭
-                                </button>
-                                <button @click="regenerateCase(selectedCase.id); showCaseDetailModal = false" 
-                                        class="px-4 py-2 bg-green-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-green-700">
-                                    <i class="fas fa-redo"></i> 重新生成
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </template>
@@ -1062,6 +1053,7 @@
                 // 编辑输出数据
                 editingOutput: false,
                 editingOutputData: '',
+                outputDataChanged: false,
 
                 // 完成统计
                 completionStats: {
@@ -1823,6 +1815,7 @@
                     this.selectedCase = caseItem;
                     this.editingOutput = false;
                     this.editingOutputData = '';
+                    this.outputDataChanged = false;
                     this.showCaseDetailModal = true;
                 },
 
@@ -1832,6 +1825,7 @@
                     if (this.editingOutput && this.selectedCase && this.selectedCase.outputData) {
                         // 进入编辑模式时，将当前输出数据格式化为JSON字符串
                         this.editingOutputData = JSON.stringify(this.selectedCase.outputData, null, 2);
+                        this.outputDataChanged = false;
                     }
                 },
 
@@ -1839,6 +1833,7 @@
                 cancelEditOutput() {
                     this.editingOutput = false;
                     this.editingOutputData = '';
+                    this.outputDataChanged = false;
                 },
 
                 // 保存编辑的输出
@@ -1858,6 +1853,35 @@
                             alert('✅ 输出结果已成功保存！');
                             this.editingOutput = false;
                             this.editingOutputData = '';
+                            this.outputDataChanged = false;
+                        }
+                    } catch (error) {
+                        alert('❌ JSON格式错误，请检查后重试！\n\n错误信息：' + error.message);
+                    }
+                },
+
+                // 保存并上传输出
+                saveAndUploadOutput() {
+                    if (!this.selectedCase) return;
+                    
+                    try {
+                        // 验证JSON格式
+                        const parsedData = JSON.parse(this.editingOutputData);
+                        
+                        // 找到对应的case并更新
+                        const caseIndex = this.cases.findIndex(c => c.id === this.selectedCase.id);
+                        if (caseIndex !== -1) {
+                            this.cases[caseIndex].outputData = parsedData;
+                            this.selectedCase.outputData = parsedData;
+                            
+                            // 模拟上传到服务器（实际场景中这里应该调用API）
+                            alert('✅ 输出结果已成功保存并上传！\n\n已更新到环境中。');
+                            
+                            // 关闭模态框
+                            this.showCaseDetailModal = false;
+                            this.editingOutput = false;
+                            this.editingOutputData = '';
+                            this.outputDataChanged = false;
                         }
                     } catch (error) {
                         alert('❌ JSON格式错误，请检查后重试！\n\n错误信息：' + error.message);
@@ -1930,10 +1954,20 @@
                                 this.taskProgress.processing--;
                                 this.taskProgress.processed++;
                                 
-                                // 3秒后隐藏进度条
+                                // 显示完成统计弹窗
                                 setTimeout(() => {
                                     this.taskProgress.show = false;
-                                }, 3000);
+                                    
+                                    // 设置完成统计数据
+                                    this.completionStats = {
+                                        total: 1,
+                                        success: this.taskProgress.success,
+                                        failed: this.taskProgress.failed
+                                    };
+                                    
+                                    // 显示完成统计弹窗
+                                    this.showCompletionModal = true;
+                                }, 1000); // 1秒后显示统计弹窗
                             }
                         }
                     }, 2000);
