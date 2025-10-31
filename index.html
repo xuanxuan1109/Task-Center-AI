@@ -1435,10 +1435,11 @@
                     this.currentTask = { ...task };
                     this.editingTaskId = task.id;
                     this.showEditModal = true;
+
                 },
 
                 deleteTask(taskId) {
-                    if (confirm('确定要删除这个任务吗？这将同时删除所有相关的Cases。')) {
+                    if (confirm('确定要删除这个任务吗？这将同时删除该任务下的所有数据。')) {
                         this.tasks = this.tasks.filter(task => task.id !== taskId);
                         this.cases = this.cases.filter(c => c.taskId !== taskId);
                     }
@@ -1709,7 +1710,7 @@
                     this.showCaseDetailModal = true;
                 },
 
-                regenerateCase(caseId) {
+                regenerateCase(caseId, showProgress = true) {
                     const caseIndex = this.cases.findIndex(c => c.id === caseId);
                     if (caseIndex === -1) return;
 
@@ -1717,6 +1718,19 @@
                     if (caseItem.retryCount >= caseItem.maxRetries) {
                         alert('已达到最大重试次数！');
                         return;
+                    }
+
+                    // 如果是单个重新生成，显示进度条
+                    if (showProgress) {
+                        this.taskProgress = {
+                            show: true,
+                            total: 1,
+                            processed: 0,
+                            success: 0,
+                            failed: 0,
+                            processing: 1,
+                            stopped: false
+                        };
                     }
 
                     // 通过索引更新以触发响应式
@@ -1737,8 +1751,29 @@
                                     generated_at: new Date().toISOString()
                                 };
                                 this.cases[idx].completedAt = new Date();
+                                
+                                // 更新进度统计
+                                if (showProgress) {
+                                    this.taskProgress.success++;
+                                }
                             } else {
                                 this.cases[idx].error = '重试失败';
+                                
+                                // 更新进度统计
+                                if (showProgress) {
+                                    this.taskProgress.failed++;
+                                }
+                            }
+                            
+                            // 更新进度条
+                            if (showProgress) {
+                                this.taskProgress.processing--;
+                                this.taskProgress.processed++;
+                                
+                                // 3秒后隐藏进度条
+                                setTimeout(() => {
+                                    this.taskProgress.show = false;
+                                }, 3000);
                             }
                         }
                     }, 2000);
@@ -1760,13 +1795,110 @@
                         return;
                     }
                     
-                    failedCases.forEach((caseItem, index) => {
-                        setTimeout(() => {
-                            this.regenerateCase(caseItem.id);
-                        }, index * 500);
-                    });
+                    // 初始化进度条
+                    this.taskProgress = {
+                        show: true,
+                        total: failedCases.length,
+                        processed: 0,
+                        success: 0,
+                        failed: 0,
+                        processing: 0,
+                        stopped: false
+                    };
+                    
+                    // 使用并发处理重新生成
+                    const concurrency = 5; // 默认并发数
+                    this.regenerateCasesWithConcurrency(failedCases, concurrency);
                     
                     alert(`开始重试 ${failedCases.length} 个失败的Cases...`);
+                },
+
+                // 并发重新生成Cases
+                regenerateCasesWithConcurrency(cases, concurrency) {
+                    let currentIndex = 0;
+                    let activeCount = 0;
+
+                    const processNext = () => {
+                        // 检查是否已停止
+                        if (this.taskProgress.stopped) {
+                            this.taskProgress.processing = 0;
+                            return;
+                        }
+
+                        while (activeCount < concurrency && currentIndex < cases.length && !this.taskProgress.stopped) {
+                            const caseItem = cases[currentIndex++];
+                            
+                            // 检查是否已达到最大重试次数
+                            if (caseItem.retryCount >= caseItem.maxRetries) {
+                                this.taskProgress.processed++;
+                                this.taskProgress.failed++;
+                                continue;
+                            }
+                            
+                            activeCount++;
+                            
+                            // 更新case状态为processing
+                            const caseIndex = this.cases.findIndex(c => c.id === caseItem.id);
+                            if (caseIndex !== -1) {
+                                this.cases[caseIndex].status = 'processing';
+                                this.cases[caseIndex].retryCount++;
+                                this.cases[caseIndex].error = null;
+                            }
+                            this.taskProgress.processing++;
+
+                            // 模拟异步处理
+                            setTimeout(() => {
+                                // 再次检查是否已停止
+                                if (this.taskProgress.stopped) {
+                                    const idx = this.cases.findIndex(c => c.id === caseItem.id);
+                                    if (idx !== -1) {
+                                        this.cases[idx].status = 'failed';
+                                        this.cases[idx].error = '用户停止处理';
+                                    }
+                                    this.taskProgress.processing--;
+                                    activeCount--;
+                                    return;
+                                }
+
+                                const success = Math.random() > 0.3; // 70%成功率
+                                
+                                // 找到对应的case并更新
+                                const idx = this.cases.findIndex(c => c.id === caseItem.id);
+                                if (idx !== -1) {
+                                    this.cases[idx].status = success ? 'success' : 'failed';
+                                    
+                                    if (success) {
+                                        this.cases[idx].outputData = {
+                                            result: '重新生成的结果数据',
+                                            generated_at: new Date().toISOString()
+                                        };
+                                        this.cases[idx].completedAt = new Date();
+                                        this.taskProgress.success++;
+                                    } else {
+                                        this.cases[idx].error = '重试失败';
+                                        this.taskProgress.failed++;
+                                    }
+                                }
+
+                                this.taskProgress.processing--;
+                                this.taskProgress.processed++;
+                                activeCount--;
+
+                                // 检查是否所有任务完成或已停止
+                                if (this.taskProgress.processed >= this.taskProgress.total || this.taskProgress.stopped) {
+                                    setTimeout(() => {
+                                        this.taskProgress.show = false;
+                                    }, 3000); // 3秒后隐藏进度条
+                                }
+
+                                if (!this.taskProgress.stopped) {
+                                    processNext();
+                                }
+                            }, Math.random() * 2000 + 1000); // 1-3秒随机延迟
+                        }
+                    };
+
+                    processNext();
                 },
 
                 // 导出Cases到Excel
