@@ -483,6 +483,11 @@
                                                         :disabled="caseItem.status === 'processing'">
                                                     <i class="fas fa-redo"></i>
                                                 </button>
+                                                <button @click="clearCaseEnvironmentData(caseItem.id)" 
+                                                        class="text-orange-600 hover:text-orange-900"
+                                                        title="清除环境数据">
+                                                    <i class="fas fa-broom"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -830,15 +835,21 @@
                             </div>
                         </div>
                         
-                        <div class="bg-gray-50 px-6 py-3 flex justify-end space-x-3">
-                            <button @click="showCaseDetailModal = false" 
-                                    class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                关闭
+                        <div class="bg-gray-50 px-6 py-3 flex justify-between items-center">
+                            <button @click="clearCaseEnvironmentData(selectedCase.id); showCaseDetailModal = false" 
+                                    class="px-4 py-2 bg-orange-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-orange-700">
+                                <i class="fas fa-broom"></i> 清除环境数据
                             </button>
-                            <button @click="regenerateCase(selectedCase.id); showCaseDetailModal = false" 
-                                    class="px-4 py-2 bg-green-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-green-700">
-                                <i class="fas fa-redo"></i> 重新生成
-                            </button>
+                            <div class="flex space-x-3">
+                                <button @click="showCaseDetailModal = false" 
+                                        class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    关闭
+                                </button>
+                                <button @click="regenerateCase(selectedCase.id); showCaseDetailModal = false" 
+                                        class="px-4 py-2 bg-green-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-green-700">
+                                    <i class="fas fa-redo"></i> 重新生成
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -1804,6 +1815,59 @@
                     XLSX.writeFile(wb, fileName);
                     
                     alert(`成功导出 ${taskCases.length} 条Cases数据！`);
+                },
+
+                // 清除Case的环境数据
+                clearCaseEnvironmentData(caseId) {
+                    const caseIndex = this.cases.findIndex(c => c.id === caseId);
+                    if (caseIndex === -1) {
+                        alert('Case未找到！');
+                        return;
+                    }
+                    
+                    const caseItem = this.cases[caseIndex];
+                    const task = this.tasks.find(t => t.id === caseItem.taskId);
+                    
+                    if (!task) {
+                        alert('任务未找到！');
+                        return;
+                    }
+                    
+                    // 获取当前环境名称
+                    const envName = task.environment === 'gray' ? '灰度环境' : '线上环境';
+                    
+                    // 显示确认对话框
+                    const confirmMessage = `确定要清除以下Case在${envName}的数据吗？\n\n` +
+                        `Case ID: #${caseItem.id}\n` +
+                        `入参: ${this.formatInputParams(caseItem.inputParams)}\n` +
+                        `状态: ${this.getCaseStatusText(caseItem.status)}\n\n` +
+                        `此操作将：\n` +
+                        `1. 删除该Case在系统中的记录\n` +
+                        `2. 清除相关的输出数据和状态\n\n` +
+                        `此操作不可恢复，是否继续？`;
+                    
+                    if (!confirm(confirmMessage)) {
+                        return;
+                    }
+                    
+                    // 模拟调用API清除环境数据（实际场景中这里应该调用后端API）
+                    // 这里可以根据实际需求添加调用Dify API或其他清理逻辑
+                    
+                    // 从数组中删除该Case
+                    this.cases.splice(caseIndex, 1);
+                    
+                    // 显示成功消息
+                    alert(`成功清除Case #${caseId} 在${envName}的数据！\n\n` +
+                        `已删除的内容：\n` +
+                        `- Case记录\n` +
+                        `- 输入参数\n` +
+                        `- 输出数据\n` +
+                        `- 执行状态`);
+                    
+                    // 如果当前页没有数据了，返回上一页
+                    if (this.getFilteredCases().length === 0 && this.currentPage > 1) {
+                        this.currentPage--;
+                    }
                 }
             }
         }
